@@ -32,61 +32,78 @@ type TextReport struct {
 }
 
 func exportLogic() func(cmd *cobra.Command, args []string) {
+	granularityOptions := []string{"lines", "functions"}
 	return func(cmd *cobra.Command, args []string) {
 		if len(args) != 1 {
 			log.Fatalf("Exactly one profile file is required")
 		}
-		for _, granularity := range []string{"lines", "functions"} {
-			err, report := generateTextReports(granularity, args[0])
-			if err == nil {
-				var w io.Writer
-				// open output file
-				if local {
-					fo, err := os.Create(localFilename)
-					if err != nil {
-						panic(err)
-					}
-					// close fo on exit and check for its returned error
-					defer func() {
-						if err := fo.Close(); err != nil {
-							panic(err)
-						}
-					}()
-					// make a write buffer
-					w = bufio.NewWriter(fo)
-					enc := json.NewEncoder(w)
-					err = enc.Encode(report)
-					if err != nil {
-						log.Fatalf("Unable to export the profile to local json. Error: %v", err)
-					} else {
-						log.Printf("Succesfully exported profile to local file %s", localFilename)
-					}
+		if local {
+			for _, granularity := range granularityOptions {
+				err, report := generateTextReports(granularity, args[0])
+				if err == nil {
+					var w io.Writer
+					// open output file
+					fmt.Println()
+					localExportLogic(w, report)
 				} else {
-					postBody, err := json.Marshal(report)
-					if err != nil {
-						log.Fatalf("An Error Occured %v", err)
-					}
-					responseBody := bytes.NewBuffer(postBody)
-					endPoint := fmt.Sprintf("%s/v1/gh/%s/%s/commit/%s/bench/%s/cpu/%s", codeperfUrl, gitOrg, gitRepo, gitCommit, bench, granularity)
-					resp, err := http.Post(endPoint, "application/json", responseBody)
-					//Handle Error
-					if err != nil {
-						log.Fatalf("An Error Occured %v", err)
-					}
-					defer resp.Body.Close()
-					//Read the response body
-					body, err := ioutil.ReadAll(resp.Body)
-					if err != nil {
-						log.Fatalln(err)
-					}
-					sb := string(body)
-					log.Printf(sb)
+					log.Fatal(err)
 				}
-			} else {
-				log.Fatal(err)
 			}
+		} else {
+			for _, granularity := range granularityOptions {
+				err, report := generateTextReports(granularity, args[0])
+				if err == nil {
+					fmt.Println()
+					remoteExportLogic(report, granularity)
+				} else {
+					log.Fatal(err)
+				}
+			}
+			log.Printf("Successfully published profile data. Check it at: %s/#/gh/%s/%s/commit/%s/bench/%s/cpu", codeperfUrl, gitOrg, gitRepo, gitCommit, bench)
 		}
 
+	}
+}
+
+func remoteExportLogic(report TextReport, granularity string) {
+	postBody, err := json.Marshal(report)
+	if err != nil {
+		log.Fatalf("An Error Occured %v", err)
+	}
+	responseBody := bytes.NewBuffer(postBody)
+	endPoint := fmt.Sprintf("%s/v1/gh/%s/%s/commit/%s/bench/%s/cpu/%s", codeperfUrl, gitOrg, gitRepo, gitCommit, bench, granularity)
+	resp, err := http.Post(endPoint, "application/json", responseBody)
+	//Handle Error
+	if err != nil {
+		log.Fatalf("An Error Occured %v", err)
+	}
+	defer resp.Body.Close()
+	//Read the response body
+	_, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func localExportLogic(w io.Writer, report TextReport) {
+	fo, err := os.Create(localFilename)
+	if err != nil {
+		panic(err)
+	}
+	// close fo on exit and check for its returned error
+	defer func() {
+		if err := fo.Close(); err != nil {
+			panic(err)
+		}
+	}()
+	// make a write buffer
+	w = bufio.NewWriter(fo)
+	enc := json.NewEncoder(w)
+	err = enc.Encode(report)
+	if err != nil {
+		log.Fatalf("Unable to export the profile to local json. Error: %v", err)
+	} else {
+		log.Printf("Succesfully exported profile to local file %s", localFilename)
 	}
 }
 
