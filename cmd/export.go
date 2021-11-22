@@ -1,0 +1,171 @@
+package cmd
+
+import (
+	"bufio"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"github.com/google/pprof/driver"
+	"github.com/spf13/cobra"
+	"io"
+	"io/ioutil"
+	"log"
+	"net/http"
+	"os"
+	"strings"
+)
+
+// TextItem holds a single text report entry.
+type TextItem struct {
+	Symbol string `json:"symbol"`
+	Flat   string `json:"flat%"`
+	Cum    string `json:"cum%"`
+}
+
+// TextReport holds a list of text items from the report and a list
+// of labels that describe the report.
+type TextReport struct {
+	Items      []TextItem `json:"data"`
+	TotalRows  int        `json:"totalRows"`
+	TotalPages int        `json:"totalPages"`
+	Labels     []string   `json:"labels"`
+}
+
+func exportLogic() func(cmd *cobra.Command, args []string) {
+	return func(cmd *cobra.Command, args []string) {
+		if len(args) != 1 {
+			log.Fatalf("Exactly one profile file is required")
+		}
+		for _, granularity := range []string{"lines", "functions"} {
+			err, report := generateTextReports(granularity, args[0])
+			if err == nil {
+				var w io.Writer
+				// open output file
+				if local {
+					fo, err := os.Create(localFilename)
+					if err != nil {
+						panic(err)
+					}
+					// close fo on exit and check for its returned error
+					defer func() {
+						if err := fo.Close(); err != nil {
+							panic(err)
+						}
+					}()
+					// make a write buffer
+					w = bufio.NewWriter(fo)
+					enc := json.NewEncoder(w)
+					err = enc.Encode(report)
+					if err != nil {
+						log.Fatalf("Unable to export the profile to local json. Error: %v", err)
+					} else {
+						log.Printf("Succesfully exported profile to local file %s", localFilename)
+					}
+				} else {
+					postBody, err := json.Marshal(report)
+					if err != nil {
+						log.Fatalf("An Error Occured %v", err)
+					}
+					responseBody := bytes.NewBuffer(postBody)
+					endPoint := fmt.Sprintf("%s/v1/gh/%s/%s/commit/%s/bench/%s/cpu/%s", codeperfUrl, gitOrg, gitRepo, gitCommit, bench, granularity)
+					resp, err := http.Post(endPoint, "application/json", responseBody)
+					//Handle Error
+					if err != nil {
+						log.Fatalf("An Error Occured %v", err)
+					}
+					defer resp.Body.Close()
+					//Read the response body
+					body, err := ioutil.ReadAll(resp.Body)
+					if err != nil {
+						log.Fatalln(err)
+					}
+					sb := string(body)
+					log.Printf(sb)
+				}
+			} else {
+				log.Fatal(err)
+			}
+		}
+
+	}
+}
+
+func generateTextReports(granularity string, input string) (err error, report TextReport) {
+	f := baseFlags()
+
+	// Read the profile from the encoded protobuf
+	outputTempFile, err := ioutil.TempFile("", "profile_output")
+	if err != nil {
+		log.Fatalf("cannot create tempfile: %v", err)
+	}
+	defer os.Remove(outputTempFile.Name())
+	defer outputTempFile.Close()
+	f.strings["output"] = outputTempFile.Name()
+	f.bools["text"] = true
+	f.bools[granularity] = true
+	f.args = []string{
+		input,
+	}
+	reader := bufio.NewReader(os.Stdin)
+	options := &driver.Options{
+		Flagset: f,
+		UI:      &UI{r: reader},
+	}
+
+	if err = driver.PProf(options); err != nil {
+		log.Fatalf("cannot read pprof profile from %s. Error: %v", input, err)
+		return
+	}
+
+	file, err := os.Open(outputTempFile.Name())
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+	r := bufio.NewReader(file)
+	benchTypeStr, _, _ := r.ReadLine()
+	benchDurationStr, _, _ := r.ReadLine()
+	benchNodesDetails, _, _ := r.ReadLine()
+	benchNodesDropDetails, _, e := r.ReadLine()
+	report.Labels = append(report.Labels, string(benchTypeStr))
+	report.Labels = append(report.Labels, string(benchDurationStr))
+	report.Labels = append(report.Labels, string(benchNodesDetails))
+	report.Labels = append(report.Labels, string(benchNodesDropDetails))
+	// ignore dropped
+	r.ReadLine()
+	// ignore header
+	r.ReadLine()
+	var b []byte
+	for e == nil {
+		b, _, e = r.ReadLine()
+		s := strings.TrimSpace(string(b))
+		// ignore flat
+		ns := strings.SplitN(s, " ", 2)
+		if len(ns) < 2 {
+			continue
+		}
+		s = strings.TrimSpace(ns[1])
+		// read flat%
+		ns = strings.SplitN(s, " ", 2)
+		flatPercent := ns[0]
+		s = strings.TrimSpace(ns[1])
+		// ignore sum
+		ns = strings.SplitN(s, " ", 2)
+		s = strings.TrimSpace(ns[1])
+		// ignore cum
+		ns = strings.SplitN(s, " ", 2)
+		s = strings.TrimSpace(ns[1])
+		// read cum%
+		ns = strings.SplitN(s, " ", 2)
+		cumPercent := ns[0]
+		symbol := strings.TrimSpace(ns[1])
+		report.Items = append(report.Items, TextItem{
+			Symbol: symbol,
+			Flat:   flatPercent,
+			Cum:    cumPercent,
+		})
+	}
+	report.TotalPages = 1
+	report.TotalRows = len(report.Items)
+	return
+}

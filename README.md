@@ -1,2 +1,8 @@
 # pprof-exporter
-Go's .profile free exporter to codeperf.io
+Export and persist Go profiling data locally, or into https://codeperf.io for FREE.
+
+
+    curl -sLS https://raw.githubusercontent.com/codeperfio/pprof-exporter/master/get.sh | sh
+    sudo install pprof-exporter /usr/local/bin/
+
+    pprof-exporter --help
