@@ -164,16 +164,28 @@ func generateTextReports(granularity string, input string) (err error, report Te
 		s = strings.TrimSpace(ns[1])
 		// read flat%
 		ns = strings.SplitN(s, " ", 2)
+		if len(ns) < 2 {
+			continue
+		}
 		flatPercent := ns[0]
 		s = strings.TrimSpace(ns[1])
 		// ignore sum
 		ns = strings.SplitN(s, " ", 2)
+		if len(ns) < 2 {
+			continue
+		}
 		s = strings.TrimSpace(ns[1])
 		// ignore cum
 		ns = strings.SplitN(s, " ", 2)
+		if len(ns) < 2 {
+			continue
+		}
 		s = strings.TrimSpace(ns[1])
 		// read cum%
 		ns = strings.SplitN(s, " ", 2)
+		if len(ns) < 2 {
+			continue
+		}
 		cumPercent := ns[0]
 		symbol := strings.TrimSpace(ns[1])
 		report.Items = append(report.Items, TextItem{
