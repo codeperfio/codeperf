@@ -21,6 +21,9 @@ all: dist hash
 gofmt:
 	@test -z $(shell gofmt -l -s $(SOURCE_DIRS) ./ | tee /dev/stderr) || (echo "[WARN] Fix formatting issues with 'make fmt'" && exit 1)
 
+build:
+	$(GOCMD) build .
+
 fmt:
 	$(GOFMT) ./...
 
@@ -32,11 +35,11 @@ lint:
 dist:
 	mkdir -p bin/
 	rm -rf bin/pprof-exporter*
-	CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -mod=vendor -a -ldflags $(LDFLAGS) -installsuffix cgo -o bin/pprof-exporter
-	CGO_ENABLED=0 GOARCH=amd64 GOOS=darwin go build -mod=vendor -a -ldflags $(LDFLAGS) -installsuffix cgo -o bin/pprof-exporter-darwin
-	GOARM=6 GOARCH=arm CGO_ENABLED=0 GOOS=linux go build -mod=vendor -a -ldflags $(LDFLAGS) -installsuffix cgo -o bin/pprof-exporter-armhf
-	GOARCH=arm64 CGO_ENABLED=0 GOOS=linux go build -mod=vendor -a -ldflags $(LDFLAGS) -installsuffix cgo -o bin/pprof-exporter-arm64
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -mod=vendor -a -ldflags $(LDFLAGS) -installsuffix cgo -o bin/pprof-exporter.exe
+	CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -a -ldflags $(LDFLAGS) -installsuffix cgo -o bin/pprof-exporter
+	CGO_ENABLED=0 GOARCH=amd64 GOOS=darwin go build -a -ldflags $(LDFLAGS) -installsuffix cgo -o bin/pprof-exporter-darwin
+	GOARM=6 GOARCH=arm CGO_ENABLED=0 GOOS=linux go build -a -ldflags $(LDFLAGS) -installsuffix cgo -o bin/pprof-exporter-armhf
+	GOARCH=arm64 CGO_ENABLED=0 GOOS=linux go build -a -ldflags $(LDFLAGS) -installsuffix cgo -o bin/pprof-exporter-arm64
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -a -ldflags $(LDFLAGS) -installsuffix cgo -o bin/pprof-exporter.exe
 
 .PHONY: hash
 hash:

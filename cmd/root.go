@@ -17,6 +17,9 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/go-git/go-git/v5"
+	"log"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"os"
@@ -57,6 +60,27 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(initConfig)
+	defaultGitOrg := ""
+	defaultGitRepo := ""
+	defaultGitCommit := ""
+
+	r, err := git.PlainOpen(".")
+	if err != nil {
+		log.Println("Unable to retrieve current repo git info. Use the --git-org, --git-repo, and --git-hash to properly fill the git info.")
+	} else {
+		ref, _ := r.Head()
+		refHash := ref.Hash().String()
+		remotes, _ := r.Remotes()
+		remoteUsed := remotes[0].Config().URLs[0]
+		fmt.Println(remoteUsed)
+		toOrg := remoteUsed[:strings.LastIndex(remoteUsed, "/")]
+		fmt.Println(toOrg)
+		defaultGitOrg = toOrg[strings.LastIndexAny(toOrg, "/:")+1:]
+		repoStartPos := strings.LastIndex(remoteUsed, "/") + 1
+		defaultGitRepo = remoteUsed[repoStartPos : len(remoteUsed)-4]
+		defaultGitCommit = refHash
+		log.Printf("Using the following default git vars org=%s repo=%s hash=%s", defaultGitOrg, defaultGitRepo, defaultGitCommit)
+	}
 
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
@@ -65,9 +89,9 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.pprof-exporter.yaml)")
 	rootCmd.PersistentFlags().BoolVar(&local, "local", false, "don't push the data to https://codeperf.io")
 	rootCmd.PersistentFlags().StringVar(&bench, "bench", "", "Benchmark name")
-	rootCmd.PersistentFlags().StringVar(&gitOrg, "git-org", "", "git org")
-	rootCmd.PersistentFlags().StringVar(&gitRepo, "git-repo", "", "git repo")
-	rootCmd.PersistentFlags().StringVar(&gitCommit, "git-commit", "", "git commit hash")
+	rootCmd.PersistentFlags().StringVar(&gitOrg, "git-org", defaultGitOrg, "git org")
+	rootCmd.PersistentFlags().StringVar(&gitRepo, "git-repo", defaultGitRepo, "git repo")
+	rootCmd.PersistentFlags().StringVar(&gitCommit, "git-hash", defaultGitCommit, "git commit hash")
 	rootCmd.PersistentFlags().StringVar(&localFilename, "local-filename", "profile.json", "Local file to export the json to. Only used when the --local flag is set")
 	rootCmd.PersistentFlags().StringVar(&codeperfUrl, "codeperf-url", "https://codeperf.io", "codeperf URL")
 	rootCmd.MarkPersistentFlagRequired("bench")

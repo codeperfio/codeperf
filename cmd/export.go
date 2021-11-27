@@ -59,7 +59,7 @@ func exportLogic() func(cmd *cobra.Command, args []string) {
 					log.Fatal(err)
 				}
 			}
-			log.Printf("Successfully published profile data. Check it at: %s/#/gh/%s/%s/commit/%s/bench/%s/cpu", codeperfUrl, gitOrg, gitRepo, gitCommit, bench)
+			log.Printf("Successfully published profile data. Check it at: %s/gh/%s/%s/commit/%s/bench/%s/cpu", codeperfUrl, gitOrg, gitRepo, gitCommit, bench)
 		}
 
 	}
