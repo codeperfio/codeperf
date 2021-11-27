@@ -92,10 +92,10 @@ getPackage() {
     ;;
     esac
 
-    targetFile="/tmp/$REPO$suffix"
+    targetFile="/tmp/$REPO"
 
     if [ "$userid" != "0" ]; then
-        targetFile="$(pwd)/$REPO$suffix"
+        targetFile="$(pwd)/$REPO"
     fi
 
     if [ -e "$targetFile" ]; then
@@ -126,7 +126,7 @@ getPackage() {
             echo "  following commands may need to be run manually."
             echo "============================================================"
             echo
-            echo "  sudo cp $REPO$suffix $BINLOCATION/$REPO"
+            echo "  sudo cp $REPO $BINLOCATION/$REPO"
 
             if [ -n "$ALIAS_NAME" ]; then
                 echo "  sudo ln -sf $BINLOCATION/$REPO $BINLOCATION/$ALIAS_NAME"
