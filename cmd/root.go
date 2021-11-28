@@ -34,6 +34,7 @@ var gitRepo string
 var gitCommit string
 var localFilename string
 var codeperfUrl string
+var codeperfApiUrl string
 var local bool
 var longDescription = `                  __                     ____        _
   _________  ____/ /__  ____  ___  _____/ __/       (_)___
@@ -92,6 +93,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&gitCommit, "git-hash", defaultGitCommit, "git commit hash")
 	rootCmd.PersistentFlags().StringVar(&localFilename, "local-filename", "profile.json", "Local file to export the json to. Only used when the --local flag is set")
 	rootCmd.PersistentFlags().StringVar(&codeperfUrl, "codeperf-url", "https://codeperf.io", "codeperf URL")
+	rootCmd.PersistentFlags().StringVar(&codeperfApiUrl, "codeperf-api-url", "https://api.codeperf.io", "codeperf API URL")
 	rootCmd.MarkPersistentFlagRequired("bench")
 }
 

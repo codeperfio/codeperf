@@ -71,17 +71,21 @@ func remoteExportLogic(report TextReport, granularity string) {
 		log.Fatalf("An Error Occured %v", err)
 	}
 	responseBody := bytes.NewBuffer(postBody)
-	endPoint := fmt.Sprintf("%s/v1/gh/%s/%s/commit/%s/bench/%s/cpu/%s", codeperfUrl, gitOrg, gitRepo, gitCommit, bench, granularity)
+	endPoint := fmt.Sprintf("%s/v1/gh/%s/%s/commit/%s/bench/%s/cpu/%s", codeperfApiUrl, gitOrg, gitRepo, gitCommit, bench, granularity)
 	resp, err := http.Post(endPoint, "application/json", responseBody)
 	//Handle Error
 	if err != nil {
 		log.Fatalf("An Error Occured %v", err)
 	}
 	defer resp.Body.Close()
+
 	//Read the response body
-	_, err = ioutil.ReadAll(resp.Body)
+	reply, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.Fatalln(err)
+	}
+	if resp.StatusCode != 200 {
+		log.Fatalf("An error ocurred while phusing data to remote %s. Status code %d. Reply: %s", codeperfApiUrl, resp.StatusCode, string(reply))
 	}
 }
 
