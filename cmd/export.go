@@ -54,7 +54,6 @@ func exportLogic() func(cmd *cobra.Command, args []string) {
 				if err == nil {
 					var w io.Writer
 					// open output file
-					fmt.Println()
 					localExportLogic(w, report)
 				} else {
 					log.Fatal(err)
@@ -64,7 +63,6 @@ func exportLogic() func(cmd *cobra.Command, args []string) {
 			for _, granularity := range granularityOptions {
 				err, report := generateTextReports(granularity, args[0])
 				if err == nil {
-					fmt.Println()
 					remoteExportLogic(report, granularity)
 				} else {
 					log.Fatal(err)
@@ -75,9 +73,9 @@ func exportLogic() func(cmd *cobra.Command, args []string) {
 				log.Fatalf("An Error Occured %v", err)
 			}
 			remoteFlameGraphExport(finalTree)
-			log.Printf("Successfully published profile data. Check it at: %s/gh/%s/%s/commit/%s/bench/%s/cpu", codeperfUrl, gitOrg, gitRepo, gitCommit, bench)
+			log.Printf("Successfully published profile data")
+			log.Printf("Check it at: %s/gh/%s/%s/commit/%s/bench/%s/cpu", codeperfUrl, gitOrg, gitRepo, gitCommit, bench)
 		}
-
 	}
 }
 

@@ -1,28 +1,60 @@
 package cmd
 
 import (
-	"fmt"
 	"github.com/google/pprof/profile"
 	"log"
+	"regexp"
 	"sort"
 	"strings"
 )
 
 type treeNode struct {
 	Name     string               `json:"n"`
+	FullName string               `json:"f"`
 	Cum      int64                `json:"v"`
 	Children map[string]*treeNode `json:"c"`
 }
 
 type treeNodeSlice struct {
 	Name     string          `json:"n"`
+	FullName string          `json:"f"`
 	Cum      int64           `json:"v"`
 	Children []treeNodeSlice `json:"c"`
 }
 
+var (
+	// Removes package name and method arguments for Java method names.
+	// See tests for examples.
+	javaRegExp = regexp.MustCompile(`^(?:[a-z]\w*\.)*([A-Z][\w\$]*\.(?:<init>|[a-z][\w\$]*(?:\$\d+)?))(?:(?:\()|$)`)
+	// Removes package name and method arguments for Go function names.
+	// See tests for examples.
+	goRegExp = regexp.MustCompile(`^(?:[\w\-\.]+\/)+(.+)`)
+	// Removes potential module versions in a package path.
+	goVerRegExp = regexp.MustCompile(`^(.*?)/v(?:[2-9]|[1-9][0-9]+)([./].*)$`)
+	// Strips C++ namespace prefix from a C++ function / method name.
+	// NOTE: Make sure to keep the template parameters in the name. Normally,
+	// template parameters are stripped from the C++ names but when
+	// -symbolize=demangle=templates flag is used, they will not be.
+	// See tests for examples.
+	cppRegExp                = regexp.MustCompile(`^(?:[_a-zA-Z]\w*::)+(_*[A-Z]\w*::~?[_a-zA-Z]\w*(?:<.*>)?)`)
+	cppAnonymousPrefixRegExp = regexp.MustCompile(`^\(anonymous namespace\)::`)
+)
+
+// ShortenFunctionName returns a shortened version of a function's name.
+func ShortenFunctionName(f string) string {
+	f = cppAnonymousPrefixRegExp.ReplaceAllString(f, "")
+	f = goVerRegExp.ReplaceAllString(f, `${1}${2}`)
+	for _, re := range []*regexp.Regexp{goRegExp, javaRegExp, cppRegExp} {
+		if matches := re.FindStringSubmatch(f); len(matches) >= 2 {
+			return strings.Join(matches[1:], "")
+		}
+	}
+	return f
+}
+
 // Convert marshals the given protobuf profile into folded text format.
 func profileToFolded(protobuf *profile.Profile) treeNodeSlice {
-	rootNode := treeNode{"root", 0, make(map[string]*treeNode, 0)}
+	rootNode := treeNode{"root", "root", 0, make(map[string]*treeNode, 0)}
 	if err := protobuf.Aggregate(true, true, false, false, false); err != nil {
 		log.Fatal(err)
 	}
@@ -30,7 +62,13 @@ func profileToFolded(protobuf *profile.Profile) treeNodeSlice {
 	sort.Slice(protobuf.Sample, func(i, j int) bool {
 		return protobuf.Sample[i].Value[0] > protobuf.Sample[j].Value[0]
 	})
+
 	for _, sample := range protobuf.Sample {
+		var cum int64 = 0
+		for _, val := range sample.Value {
+			cum = cum + val
+			break
+		}
 		var frames []string
 		var currentNode *treeNode
 		var currentMap map[string]*treeNode = rootNode.Children
@@ -39,37 +77,27 @@ func profileToFolded(protobuf *profile.Profile) treeNodeSlice {
 			loc := sample.Location[len(sample.Location)-i-1]
 			for j := range loc.Line {
 				line := loc.Line[len(loc.Line)-j-1]
-				fname := line.Function.Name
-				currentNode, ok = currentMap[fname]
+				fname := ShortenFunctionName(line.Function.Name)
+				shortName := fname[strings.LastIndex(fname, ".")+1:]
+				currentNode, ok = currentMap[shortName]
 				if !ok {
-					currentNode = &treeNode{fname, 0, make(map[string]*treeNode, 0)}
-					currentMap[fname] = currentNode
+					currentNode = &treeNode{shortName, fname, 0, make(map[string]*treeNode, 0)}
+					currentMap[shortName] = currentNode
 				}
+				currentNode.Cum += cum
 				currentMap = currentNode.Children
-				frames = append(frames, fname)
+				frames = append(frames, shortName)
 			}
 		}
-
-		var values []string
-		for _, val := range sample.Value {
-			values = append(values, fmt.Sprintf("%d", val))
-			currentNode.Cum = currentNode.Cum + val
-			break
-		}
-		fmt.Printf(
-			"%s %s\n",
-			strings.Join(frames, ";"),
-			strings.Join(values, " "),
-		)
 	}
-	finalTree := treeNodeSlice{rootNode.Name, rootNode.Cum, collapse(rootNode.Children)}
+	finalTree := treeNodeSlice{rootNode.Name, rootNode.FullName, rootNode.Cum, collapse(rootNode.Children)}
 	return finalTree
 }
 
 func collapse(children map[string]*treeNode) (tree []treeNodeSlice) {
 	tree = make([]treeNodeSlice, 0)
 	for _, k := range children {
-		nS := treeNodeSlice{k.Name, k.Cum, collapse(k.Children)}
+		nS := treeNodeSlice{k.Name, k.FullName, k.Cum, collapse(k.Children)}
 		tree = append(tree, nS)
 	}
 	return
