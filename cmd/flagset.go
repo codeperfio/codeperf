@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"bufio"
-	"fmt"
+	"log"
 	"os"
 )
 
@@ -88,11 +88,11 @@ func (ui *UI) ReadLine(prompt string) (string, error) {
 }
 
 func (ui *UI) Print(args ...interface{}) {
-	fmt.Fprint(os.Stderr, args...)
+	log.Print(args...)
 }
 
 func (ui *UI) PrintErr(args ...interface{}) {
-	fmt.Fprint(os.Stderr, args...)
+	log.Print(args...)
 }
 
 func (ui *UI) IsTerminal() bool {

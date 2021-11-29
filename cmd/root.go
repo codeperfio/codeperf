@@ -78,7 +78,7 @@ func init() {
 		repoStartPos := strings.LastIndex(remoteUsed, "/") + 1
 		defaultGitRepo = remoteUsed[repoStartPos : len(remoteUsed)-4]
 		defaultGitCommit = refHash
-		fmt.Printf("Detected the following git vars org=%s repo=%s hash=%s", defaultGitOrg, defaultGitRepo, defaultGitCommit)
+		log.Printf("Detected the following git vars org=%s repo=%s hash=%s\n", defaultGitOrg, defaultGitRepo, defaultGitCommit)
 	}
 
 	// Here you will define your flags and configuration settings.

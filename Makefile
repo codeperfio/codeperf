@@ -25,7 +25,8 @@ build:
 	$(GOCMD) build .
 
 fmt:
-	$(GOFMT) ./...
+	$(GOFMT) ./*.go
+	$(GOFMT) ./cmd/*.go
 
 lint:
 	$(GOGET) github.com/golangci/golangci-lint/cmd/golangci-lint
