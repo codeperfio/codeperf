@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/google/pprof/driver"
+	"github.com/google/pprof/profile"
 	"github.com/spf13/cobra"
 	"io"
 	"io/ioutil"
@@ -38,6 +39,16 @@ func exportLogic() func(cmd *cobra.Command, args []string) {
 			log.Fatalf("Exactly one profile file is required")
 		}
 		if local {
+			err, finalTree := generateFlameGraph(args[0])
+			if err != nil {
+				log.Fatalf("An Error Occured %v", err)
+			}
+			postBody, err := json.Marshal(finalTree)
+			if err != nil {
+				log.Fatalf("An Error Occured %v", err)
+			}
+			fmt.Println(string(postBody))
+
 			for _, granularity := range granularityOptions {
 				err, report := generateTextReports(granularity, args[0])
 				if err == nil {
@@ -59,10 +70,40 @@ func exportLogic() func(cmd *cobra.Command, args []string) {
 					log.Fatal(err)
 				}
 			}
+			err, finalTree := generateFlameGraph(args[0])
+			if err != nil {
+				log.Fatalf("An Error Occured %v", err)
+			}
+			remoteFlameGraphExport(finalTree)
 			log.Printf("Successfully published profile data. Check it at: %s/gh/%s/%s/commit/%s/bench/%s/cpu", codeperfUrl, gitOrg, gitRepo, gitCommit, bench)
 		}
 
 	}
+}
+
+func remoteFlameGraphExport(tree treeNodeSlice) {
+	postBody, err := json.Marshal(tree)
+	if err != nil {
+		log.Fatalf("An Error Occured %v", err)
+	}
+	responseBody := bytes.NewBuffer(postBody)
+	endPoint := fmt.Sprintf("%s/v1/gh/%s/%s/commit/%s/bench/%s/cpu/flamegraph", codeperfApiUrl, gitOrg, gitRepo, gitCommit, bench)
+	resp, err := http.Post(endPoint, "application/json", responseBody)
+	//Handle Error
+	if err != nil {
+		log.Fatalf("An Error Occured %v", err)
+	}
+	defer resp.Body.Close()
+
+	//Read the response body
+	reply, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	if resp.StatusCode != 200 {
+		log.Fatalf("An error ocurred while phusing data to remote %s. Status code %d. Reply: %s", codeperfApiUrl, resp.StatusCode, string(reply))
+	}
+
 }
 
 func remoteExportLogic(report TextReport, granularity string) {
@@ -109,6 +150,48 @@ func localExportLogic(w io.Writer, report TextReport) {
 	} else {
 		log.Printf("Succesfully exported profile to local file %s", localFilename)
 	}
+}
+
+func generateFlameGraph(input string) (err error, tree treeNodeSlice) {
+	f := baseFlags()
+
+	// Read the profile from the encoded protobuf
+	outputTempFile, err := ioutil.TempFile("", "profile_output")
+	if err != nil {
+		log.Fatalf("cannot create tempfile: %v", err)
+	}
+	log.Printf("Generating temp file %s", outputTempFile.Name())
+	//defer os.Remove(outputTempFile.Name())
+	defer outputTempFile.Close()
+	f.strings["output"] = outputTempFile.Name()
+	f.bools["proto"] = true
+	f.bools["text"] = false
+	f.args = []string{
+		input,
+	}
+	reader := bufio.NewReader(os.Stdin)
+	options := &driver.Options{
+		Flagset: f,
+		UI:      &UI{r: reader},
+	}
+
+	if err = driver.PProf(options); err != nil {
+		log.Fatalf("cannot read pprof profile from %s. Error: %v", input, err)
+		return
+	}
+
+	file, err := os.Open(outputTempFile.Name())
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+	r := bufio.NewReader(file)
+	profile, err := profile.Parse(r)
+	if err != nil {
+		log.Fatal(err)
+	}
+	tree = profileToFolded(profile)
+	return
 }
 
 func generateTextReports(granularity string, input string) (err error, report TextReport) {
