@@ -21,6 +21,9 @@ all: dist hash
 gofmt:
 	@test -z $(shell gofmt -l -s $(SOURCE_DIRS) ./ | tee /dev/stderr) || (echo "[WARN] Fix formatting issues with 'make fmt'" && exit 1)
 
+test:
+	$(GOCMD) test -count=1 -v ./cmd/.
+
 build:
 	$(GOCMD) build .
 
