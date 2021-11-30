@@ -71,14 +71,14 @@ func init() {
 	} else {
 		ref, _ := r.Head()
 		refHash := ref.Hash().String()
+		defaultGitCommit = getShortHash(refHash, 7)
 		remotes, _ := r.Remotes()
-		remoteUsed := remotes[0].Config().URLs[0]
-		toOrg := remoteUsed[:strings.LastIndex(remoteUsed, "/")]
-		defaultGitOrg = toOrg[strings.LastIndexAny(toOrg, "/:")+1:]
-		repoStartPos := strings.LastIndex(remoteUsed, "/") + 1
-		defaultGitRepo = remoteUsed[repoStartPos : len(remoteUsed)-4]
-		defaultGitCommit = refHash
-		log.Printf("Detected the following git vars org=%s repo=%s hash=%s\n", defaultGitOrg, defaultGitRepo, defaultGitCommit)
+		if len(remotes) > 0 {
+			remoteUsed := remotes[0].Config().URLs[0]
+			log.Printf("Detected a total of %d remotes. Using the 1st remote url %s to retrieve git info", len(remotes), remoteUsed)
+			defaultGitOrg, defaultGitRepo = fromRemoteToOrgRepo(remoteUsed)
+			log.Printf("Detected the following git vars org=%s repo=%s hash=%s\n", defaultGitOrg, defaultGitRepo, defaultGitCommit)
+		}
 	}
 
 	// Here you will define your flags and configuration settings.
@@ -95,6 +95,29 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&codeperfUrl, "codeperf-url", "https://codeperf.io", "codeperf URL")
 	rootCmd.PersistentFlags().StringVar(&codeperfApiUrl, "codeperf-api-url", "https://api.codeperf.io", "codeperf API URL")
 	rootCmd.MarkPersistentFlagRequired("bench")
+}
+
+// Abbreviate the long hash to a short hash (7 digits)
+func getShortHash(hash string, ndigits int) (short string) {
+	if len(hash) < ndigits {
+		short = hash
+	} else {
+		short = hash[:ndigits]
+	}
+	return
+}
+
+func fromRemoteToOrgRepo(remoteUsed string) (defaultGitOrg string, defaultGitRepo string) {
+	toOrg := remoteUsed[:strings.LastIndex(remoteUsed, "/")]
+	defaultGitOrg = toOrg[strings.LastIndexAny(toOrg, "/:")+1:]
+	repoStartPos := strings.LastIndex(remoteUsed, "/") + 1
+	repoEndPos := strings.LastIndex(remoteUsed[repoStartPos:], ".")
+	if repoEndPos < 0 {
+		defaultGitRepo = remoteUsed[repoStartPos:]
+	} else {
+		defaultGitRepo = remoteUsed[repoStartPos : repoStartPos+repoEndPos]
+	}
+	return
 }
 
 // initConfig reads in config file and ENV variables if set.
