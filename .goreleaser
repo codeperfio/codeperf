@@ -20,10 +20,13 @@ universal_binaries:
 brews:
   -
     name: codeperf
-    homepage: "https://github.com/codeperfio/codeperf"
+    homepage: "https://codeperf.io"
+    description: "Export, persist and compare profiling data using https://codeperf.io."
+
     tap:
-      owner: codeperf
+      owner: codeperfio
       name: homebrew-codeperf
+
     commit_author:
       name: codeperf.io
       email: hello@codeperf.io
