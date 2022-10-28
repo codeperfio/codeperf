@@ -1,4 +1,4 @@
-module github.com/codeperfio/pprof-exporter
+module github.com/codeperfio/codeperf
 
 go 1.16
 

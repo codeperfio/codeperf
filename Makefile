@@ -10,7 +10,7 @@ ifeq ($(GIT_VERSION),)
 GIT_VERSION:=$(shell git describe --tags --dirty)
 endif
 
-LDFLAGS := "-s -w -X github.com/codeperfio/pprof-exporter/cmd.Version=$(GIT_VERSION) -X github.com/codeperfio/pprof-exporter/cmd.GitCommit=$(GIT_COMMIT)"
+LDFLAGS := "-s -w -X github.com/codeperfio/codeperf/cmd.Version=$(GIT_VERSION) -X github.com/codeperfio/codeperf/cmd.GitCommit=$(GIT_COMMIT)"
 export GO111MODULE=on
 SOURCE_DIRS = cmd main.go
 
@@ -38,12 +38,11 @@ lint:
 .PHONY: dist
 dist:
 	mkdir -p bin/
-	rm -rf bin/pprof-exporter*
-	CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -a -ldflags $(LDFLAGS) -installsuffix cgo -o bin/pprof-exporter
-	CGO_ENABLED=0 GOARCH=amd64 GOOS=darwin go build -a -ldflags $(LDFLAGS) -installsuffix cgo -o bin/pprof-exporter-darwin
-	GOARM=6 GOARCH=arm CGO_ENABLED=0 GOOS=linux go build -a -ldflags $(LDFLAGS) -installsuffix cgo -o bin/pprof-exporter-armhf
-	GOARCH=arm64 CGO_ENABLED=0 GOOS=linux go build -a -ldflags $(LDFLAGS) -installsuffix cgo -o bin/pprof-exporter-arm64
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -a -ldflags $(LDFLAGS) -installsuffix cgo -o bin/pprof-exporter.exe
+	rm -rf bin/codeperf*
+	CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -a -ldflags $(LDFLAGS) -installsuffix cgo -o bin/codeperf
+	CGO_ENABLED=0 GOARCH=amd64 GOOS=darwin go build -a -ldflags $(LDFLAGS) -installsuffix cgo -o bin/codeperf-darwin
+	GOARM=6 GOARCH=arm CGO_ENABLED=0 GOOS=linux go build -a -ldflags $(LDFLAGS) -installsuffix cgo -o bin/codeperf-armhf
+	GOARCH=arm64 CGO_ENABLED=0 GOOS=linux go build -a -ldflags $(LDFLAGS) -installsuffix cgo -o bin/codeperf-arm64
 
 .PHONY: hash
 hash:
