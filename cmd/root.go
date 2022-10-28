@@ -1,11 +1,11 @@
 /*
-Copyright © 2021 NAME HERE <EMAIL ADDRESS>
+Copyright © 2022 codeperf.io <hello@codeperf.io>
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -43,12 +43,12 @@ var longDescription = `                  __                     ____        _
 \___/\____/\__,_/\___/ .___/\___/_/  /_/    (_)  /_/\____/
                     /_/
 
-Export and persist Go's profiling data locally, or into https://codeperf.io for FREE.`
+Export and persist Go's profiling data locally, or into https://codeperf.io.`
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "pprof-exporter",
-	Short: "Export and persist Go's profiling data locally, or into https://codeperf.io for FREE.",
+	Short: "Export and persist Go's profiling data locally, or into https://codeperf.io.",
 	Long:  longDescription,
 	Run:   exportLogic(),
 }
@@ -85,7 +85,7 @@ func init() {
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.pprof-exporter.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.codeperf.yaml)")
 	rootCmd.PersistentFlags().BoolVar(&local, "local", false, "don't push the data to https://codeperf.io")
 	rootCmd.PersistentFlags().StringVar(&bench, "bench", "", "Benchmark name")
 	rootCmd.PersistentFlags().StringVar(&gitOrg, "git-org", defaultGitOrg, "git org")
@@ -130,10 +130,10 @@ func initConfig() {
 		home, err := os.UserHomeDir()
 		cobra.CheckErr(err)
 
-		// Search config in home directory with name ".pprof-exporter" (without extension).
+		// Search config in home directory with name ".codeperf" (without extension).
 		viper.AddConfigPath(home)
 		viper.SetConfigType("yaml")
-		viper.SetConfigName(".pprof-exporter")
+		viper.SetConfigName(".codeperf")
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
