@@ -7,6 +7,8 @@
 bin
 pprof-exporter*
 codeperf*
+dist
+vendor
 
 # Test binary, built with `go test -c`
 *.test

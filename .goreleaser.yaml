@@ -11,11 +11,14 @@ builds:
     flags:
       - -mod=vendor
 
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+
 release:
   prerelease: auto
 
 universal_binaries:
-  - replace: true
+  - replace: false
 
 brews:
   -
