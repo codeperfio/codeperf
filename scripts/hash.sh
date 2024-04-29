@@ -1,3 +1,3 @@
 #!/bin/sh
 
-for f in bin/pprof-*; do shasum -a 256 $f > $f.sha256; done
+for f in bin/codeperf-*; do shasum -a 256 $f > $f.sha256; done
