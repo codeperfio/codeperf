@@ -1,8 +1,8 @@
-# pprof-exporter
-Export and persist Go profiling data locally, or into https://codeperf.io for FREE.
+# codeperf
+Export and persist performance data into https://codeperf.io.
 
 
-    bash <(curl -s https://raw.githubusercontent.com/codeperfio/pprof-exporter/main/get.sh)
-    sudo install pprof-exporter /usr/local/bin/
+    bash <(curl -s https://raw.githubusercontent.com/codeperfio/codeperf/main/get.sh)
+    sudo install codeperf /usr/local/bin/
 
-    pprof-exporter --help
+    codeperf --help
