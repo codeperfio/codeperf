@@ -25,7 +25,6 @@ brews:
     name: codeperf
     homepage: "https://codeperf.io"
     description: "Export, persist and compare profiling data using https://codeperf.io."
-brews:
 
     repository:
       owner: codeperfio
