@@ -8,7 +8,7 @@
 export VERIFY_CHECKSUM=0
 export ALIAS=""
 export OWNER=codeperfio
-export REPO=pprof-exporter
+export REPO=codeperf
 export SUCCESS_CMD="$REPO version"
 export BINLOCATION="/usr/local/bin"
 

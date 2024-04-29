@@ -33,59 +33,66 @@ type TextReport struct {
 }
 
 func exportLogic() func(cmd *cobra.Command, args []string) {
-	granularityOptions := []string{"lines", "functions"}
+
 	return func(cmd *cobra.Command, args []string) {
 		if len(args) != 1 {
 			log.Fatalf("Exactly one profile file is required")
 		}
-		if local {
-			err, finalTree := generateFlameGraph(args[0])
-			if err != nil {
-				log.Fatalf("An Error Occured %v", err)
-			}
-			postBody, err := json.Marshal(finalTree)
-			if err != nil {
-				log.Fatalf("An Error Occured %v", err)
-			}
-			fmt.Println(string(postBody))
-
-			for _, granularity := range granularityOptions {
-				err, report := generateTextReports(granularity, args[0])
-				if err == nil {
-					var w io.Writer
-					// open output file
-					localExportLogic(w, report)
-				} else {
-					log.Fatal(err)
-				}
-			}
-		} else {
-			for _, granularity := range granularityOptions {
-				err, report := generateTextReports(granularity, args[0])
-				if err == nil {
-					remoteExportLogic(report, granularity)
-				} else {
-					log.Fatal(err)
-				}
-			}
-			err, finalTree := generateFlameGraph(args[0])
-			if err != nil {
-				log.Fatalf("An Error Occured %v", err)
-			}
-			remoteFlameGraphExport(finalTree)
-			log.Printf("Successfully published profile data")
-			log.Printf("Check it at: %s/gh/%s/%s/commit/%s/bench/%s/cpu", codeperfUrl, gitOrg, gitRepo, gitCommit, bench)
-		}
+		inputName := args[0]
+		granularityOptions := []string{"lines", "functions"}
+		exportFromPprof(inputName, bench, granularityOptions)
 	}
 }
 
-func remoteFlameGraphExport(tree treeNodeSlice) {
+func exportFromPprof(inputName string, benchmark string, granularityOptions []string) {
+	if local {
+		err, finalTree := generateFlameGraph(inputName)
+		if err != nil {
+			log.Fatalf("An Error Occured %v", err)
+		}
+		postBody, err := json.Marshal(finalTree)
+		if err != nil {
+			log.Fatalf("An Error Occured %v", err)
+		}
+		fmt.Println(string(postBody))
+
+		for _, granularity := range granularityOptions {
+			err, report := generateTextReports(granularity, inputName)
+			if err == nil {
+				var w io.Writer
+				// open output file
+				localExportLogic(w, report)
+			} else {
+				log.Fatal(err)
+			}
+		}
+	} else {
+		for _, granularity := range granularityOptions {
+			err, report := generateTextReports(granularity, inputName)
+			if err == nil {
+				remoteExportLogic(report, benchmark, granularity)
+			} else {
+				log.Fatal(err)
+			}
+		}
+		err, finalTree := generateFlameGraph(inputName)
+		if err != nil {
+			log.Fatalf("An Error Occured %v", err)
+		}
+		remoteFlameGraphExport(finalTree, benchmark)
+		log.Printf("Successfully published profile data")
+		link := fmt.Sprintf("%s/gh/%s/%s/commit/%s/bench/%s/cpu", codeperfUrl, gitOrg, gitRepo, gitCommit, benchmark)
+		log.Printf(link)
+	}
+}
+
+func remoteFlameGraphExport(tree treeNodeSlice, benchmark string) {
 	postBody, err := json.Marshal(tree)
 	if err != nil {
 		log.Fatalf("An Error Occured %v", err)
 	}
 	responseBody := bytes.NewBuffer(postBody)
-	endPoint := fmt.Sprintf("%s/v1/gh/%s/%s/commit/%s/bench/%s/cpu/flamegraph", codeperfApiUrl, gitOrg, gitRepo, gitCommit, bench)
+	endPoint := fmt.Sprintf("%s/v1/gh/%s/%s/commit/%s/bench/%s/cpu/flamegraph", codeperfApiUrl, gitOrg, gitRepo, gitCommit, benchmark)
 	resp, err := http.Post(endPoint, "application/json", responseBody)
 	//Handle Error
 	if err != nil {
@@ -99,18 +106,18 @@ func remoteFlameGraphExport(tree treeNodeSlice) {
 		log.Fatalln(err)
 	}
 	if resp.StatusCode != 200 {
-		log.Fatalf("An error ocurred while phusing data to remote %s. Status code %d. Reply: %s", codeperfApiUrl, resp.StatusCode, string(reply))
+		log.Fatalf("An error ocurred while phusing flamegraph data to remote %s. Status code %d. Reply: %s", codeperfApiUrl, resp.StatusCode, string(reply))
 	}
 
 }
 
-func remoteExportLogic(report TextReport, granularity string) {
+func remoteExportLogic(report TextReport, benchmark string, granularity string) {
 	postBody, err := json.Marshal(report)
 	if err != nil {
 		log.Fatalf("An Error Occured %v", err)
 	}
 	responseBody := bytes.NewBuffer(postBody)
-	endPoint := fmt.Sprintf("%s/v1/gh/%s/%s/commit/%s/bench/%s/cpu/%s", codeperfApiUrl, gitOrg, gitRepo, gitCommit, bench, granularity)
+	endPoint := fmt.Sprintf("%s/v1/gh/%s/%s/commit/%s/bench/%s/cpu/%s", codeperfApiUrl, gitOrg, gitRepo, gitCommit, benchmark, granularity)
 	resp, err := http.Post(endPoint, "application/json", responseBody)
 	//Handle Error
 	if err != nil {
@@ -124,7 +131,7 @@ func remoteExportLogic(report TextReport, granularity string) {
 		log.Fatalln(err)
 	}
 	if resp.StatusCode != 200 {
-		log.Fatalf("An error ocurred while phusing data to remote %s. Status code %d. Reply: %s", codeperfApiUrl, resp.StatusCode, string(reply))
+		log.Fatalf("An error ocurred while pushing cpu data to remote %s.\nEndpoint %s. Status code %d. Reply: %s", codeperfApiUrl, endPoint, resp.StatusCode, string(reply))
 	}
 }
 

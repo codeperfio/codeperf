@@ -16,9 +16,14 @@ limitations under the License.
 package cmd
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/go-git/go-git/v5"
+	"io/ioutil"
 	"log"
+	"net/http"
+	"os/exec"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -31,6 +36,7 @@ var cfgFile string
 var bench string
 var gitOrg string
 var gitRepo string
+var gitBranch string
 var gitCommit string
 var localFilename string
 var codeperfUrl string
@@ -43,19 +49,99 @@ var longDescription = `                  __                     ____        _
 \___/\____/\__,_/\___/ .___/\___/_/  /_/    (_)  /_/\____/
                     /_/
 
-Export and persist Go's profiling data locally, or into https://codeperf.io.`
+Export and persist Go's performance data into https://codeperf.io.`
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "pprof-exporter",
-	Short: "Export and persist Go's profiling data locally, or into https://codeperf.io.",
+	Use:   "codeperf",
+	Short: "Export and persist Go's performance into https://codeperf.io.",
 	Long:  longDescription,
-	Run:   exportLogic(),
+}
+
+var cmdPrint = &cobra.Command{
+	Use:   "test",
+	Short: "Print anything to the screen",
+	Long: `print is for printing anything back to the screen.
+For many years people have printed back to the screen.`,
+	Args: cobra.MinimumNArgs(0),
+	Run:  testLogic,
+}
+
+func testLogic(cmd *cobra.Command, args []string) {
+	// TODO: Check pprof is available on path
+	const shell = "/bin/bash"
+	benchmarks, _ := GetBenchmarks(".")
+	benchtime := "1s"
+	var err error = nil
+
+	goPath, err := exec.LookPath("go")
+
+	log.Println(fmt.Sprintf("Detected %d distinct benchmarks.", len(benchmarks)))
+	for _, benchmark := range benchmarks {
+
+		cpuProfileName := fmt.Sprintf("cpuprofile-%s.out", benchmark)
+		cmdS := fmt.Sprintf("%s test -bench=%s -benchtime=%s -cpuprofile %s .", goPath, benchmark, benchtime, cpuProfileName)
+		log.Println(fmt.Sprintf("Running benchmark %s with the following command: %s.", benchmark, cmdS))
+		err := exec.Command(shell, "-c", cmdS).Run()
+		if err != nil {
+			log.Fatal(err)
+		}
+		granularityOptions := []string{"lines", "functions"}
+		exportFromPprof(cpuProfileName, benchmark, granularityOptions)
+	}
+	coverprofile := "coverage.out"
+	cmdS := fmt.Sprintf("%s test -cover -bench=. -benchtime=0.01s -coverprofile %s .", goPath, coverprofile)
+	log.Println(fmt.Sprintf("Calculating the project benchmark coverage with the following command: %s.", cmdS))
+	c := exec.Command(shell, "-c", cmdS)
+	var outb, errb bytes.Buffer
+	c.Stdout = &outb
+	c.Stderr = &errb
+	err = c.Run()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cleaned := strings.TrimSpace(string(outb.String()))
+	lines := strings.Split(cleaned, "\n")
+	coverageLine := lines[len(lines)-2]
+	coverageLineS := strings.Split(coverageLine, ":")
+	coverageVs := strings.Split(strings.TrimSpace(coverageLineS[1]), " ")[0]
+	coverageVs = coverageVs[0 : len(coverageVs)-1]
+	fmt.Println(coverageLine, coverageVs)
+	exportCoverage(coverageVs)
+}
+
+func exportCoverage(vs string) {
+	postBody, err := json.Marshal(map[string]string{"coverage": vs})
+	if err != nil {
+		log.Fatalf("An Error Occured %v", err)
+	}
+	fmt.Println(string(postBody))
+
+	responseBody := bytes.NewBuffer(postBody)
+	endPoint := fmt.Sprintf("%s/v1/gh/%s/%s/branch/%s/graph", codeperfApiUrl, gitOrg, gitRepo, gitBranch)
+	resp, err := http.Post(endPoint, "application/json", responseBody)
+	//Handle Error
+	if err != nil {
+		log.Fatalf("An Error Occured %v", err)
+	}
+	defer resp.Body.Close()
+
+	//Read the response body
+	reply, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	if resp.StatusCode != 200 {
+		log.Fatalf("An error ocurred while pushing cpu data to remote %s.\nEndpoint %s. Status code %d. Reply: %s", codeperfApiUrl, endPoint, resp.StatusCode, string(reply))
+	}
+
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
+	rootCmd.AddCommand(cmdPrint)
 	cobra.CheckErr(rootCmd.Execute())
 }
 
@@ -64,12 +150,16 @@ func init() {
 	defaultGitOrg := ""
 	defaultGitRepo := ""
 	defaultGitCommit := ""
+	defaultGitBranch := ""
 
 	r, err := git.PlainOpen(".")
 	if err != nil {
-		log.Println("Unable to retrieve current repo git info. Use the --git-org, --git-repo, and --git-hash to properly fill the git info.")
+		log.Println("Unable to retrieve current repo git info. Use the --git-org, --git-repo, --git-branch and --git-hash to properly fill the git info.")
 	} else {
 		ref, _ := r.Head()
+		if ref.Name().IsBranch() {
+			defaultGitBranch = ref.Name().Short()
+		}
 		refHash := ref.Hash().String()
 		defaultGitCommit = getShortHash(refHash, 7)
 		remotes, _ := r.Remotes()
@@ -87,14 +177,15 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.codeperf.yaml)")
 	rootCmd.PersistentFlags().BoolVar(&local, "local", false, "don't push the data to https://codeperf.io")
-	rootCmd.PersistentFlags().StringVar(&bench, "bench", "", "Benchmark name")
 	rootCmd.PersistentFlags().StringVar(&gitOrg, "git-org", defaultGitOrg, "git org")
 	rootCmd.PersistentFlags().StringVar(&gitRepo, "git-repo", defaultGitRepo, "git repo")
 	rootCmd.PersistentFlags().StringVar(&gitCommit, "git-hash", defaultGitCommit, "git commit hash")
+	rootCmd.PersistentFlags().StringVar(&gitBranch, "git-branch", defaultGitBranch, "git branch")
 	rootCmd.PersistentFlags().StringVar(&localFilename, "local-filename", "profile.json", "Local file to export the json to. Only used when the --local flag is set")
 	rootCmd.PersistentFlags().StringVar(&codeperfUrl, "codeperf-url", "https://codeperf.io", "codeperf URL")
 	rootCmd.PersistentFlags().StringVar(&codeperfApiUrl, "codeperf-api-url", "https://api.codeperf.io", "codeperf API URL")
-	rootCmd.MarkPersistentFlagRequired("bench")
+	rootCmd.PersistentFlags().StringVar(&bench, "bench", "", "Benchmark name")
+	//rootCmd.MarkPersistentFlagRequired("bench")
 }
 
 // Abbreviate the long hash to a short hash (7 digits)
