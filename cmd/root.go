@@ -41,6 +41,7 @@ var gitCommit string
 var localFilename string
 var codeperfUrl string
 var codeperfApiUrl string
+var benchTime string
 var local bool
 var longDescription = `                  __                     ____        _
   _________  ____/ /__  ____  ___  _____/ __/       (_)___
@@ -71,7 +72,6 @@ func testLogic(cmd *cobra.Command, args []string) {
 	// TODO: Check pprof is available on path
 	const shell = "/bin/bash"
 	benchmarks, _ := GetBenchmarks(".")
-	benchtime := "1s"
 	var err error = nil
 
 	goPath, err := exec.LookPath("go")
@@ -184,6 +184,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&localFilename, "local-filename", "profile.json", "Local file to export the json to. Only used when the --local flag is set")
 	rootCmd.PersistentFlags().StringVar(&codeperfUrl, "codeperf-url", "https://codeperf.io", "codeperf URL")
 	rootCmd.PersistentFlags().StringVar(&codeperfApiUrl, "codeperf-api-url", "https://api.codeperf.io", "codeperf API URL")
+	rootCmd.PersistentFlags().StringVar(&benchTime, "benchtime", "10s", "benchmark time")
 	rootCmd.PersistentFlags().StringVar(&bench, "bench", "", "Benchmark name")
 	//rootCmd.MarkPersistentFlagRequired("bench")
 }
